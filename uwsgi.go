@@ -8,7 +8,6 @@ import (
 	"encoding/binary"
 	"fmt"
 	"io"
-	"log"
 	"net"
 	"net/http"
 	"strconv"
@@ -137,14 +136,11 @@ func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 }
 
 func logFunc(r *http.Request) func(format string, v ...interface{}) {
-	if r == nil {
-		return func(string, ...interface{}) {}
-	}
 	srv, ok := r.Context().Value(http.ServerContextKey).(*http.Server)
 	if ok && srv.ErrorLog != nil {
 		return srv.ErrorLog.Printf
 	}
-	return log.Printf
+	return func(string, ...interface{}) {}
 }
 
 const maxSize = 1<<16 - 1 // max uint16 value (standard uwsgi packet payload size)
