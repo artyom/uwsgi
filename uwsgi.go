@@ -13,6 +13,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 	"unicode"
 )
 
@@ -88,12 +89,36 @@ func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			http.StatusRequestHeaderFieldsTooLarge)
 		return
 	}
-	conn, err := dial(r.Context())
-	if err != nil {
+	var conn net.Conn
+	var err error
+	var tempDelay time.Duration
+	for {
+		if conn, err = dial(r.Context()); err == nil {
+			break
+		}
 		if err == context.Canceled {
 			panic(http.ErrAbortHandler)
 		}
-		logf("uwsig.handler backend dial: %v", err)
+		if ne, ok := err.(net.Error); ok && ne.Temporary() {
+			if tempDelay == 0 {
+				tempDelay = 5 * time.Millisecond
+			} else {
+				tempDelay *= 2
+			}
+			if tempDelay > time.Second {
+				logf("uwsgi backend connect: %v", err)
+				http.Error(w, http.StatusText(http.StatusGatewayTimeout),
+					http.StatusGatewayTimeout)
+				return
+			}
+			select {
+			case <-time.After(tempDelay):
+				continue
+			case <-r.Context().Done():
+				panic(http.ErrAbortHandler)
+			}
+		}
+		logf("uwsgi backend connect: %v", err)
 		http.Error(w, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
 		return
 	}
