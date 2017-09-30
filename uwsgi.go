@@ -48,6 +48,7 @@ func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		{"PATH_INFO", r.URL.Path},
 		{"SERVER_PROTOCOL", r.Proto},
 		{"REQUEST_SCHEME", r.URL.Scheme},
+		{"SERVER_NAME", r.Host},
 	}
 	if r.URL.Scheme == "https" {
 		headers = append(headers, hdr{"HTTPS", "on"})
@@ -56,8 +57,8 @@ func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		headers = append(headers, hdr{"REMOTE_ADDR", host}, hdr{"REMOTE_PORT", port})
 	}
 	if addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
-		if host, port, err := net.SplitHostPort(addr.String()); err == nil {
-			headers = append(headers, hdr{"SERVER_NAME", host}, hdr{"SERVER_PORT", port})
+		if _, port, err := net.SplitHostPort(addr.String()); err == nil {
+			headers = append(headers, hdr{"SERVER_PORT", port})
 		}
 	}
 	for k, v := range r.Header {
