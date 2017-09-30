@@ -28,6 +28,11 @@ import (
 //		return d.DialContext(ctx, network, addr)
 //	}
 //	log.Fatal(http.ListenAndServe("localhost:8080", uwsgi.Handler(fn)))
+//
+// Handler fills some uWSGI-specific headers for backend; REMOTE_ADDR is
+// populated from X-Forwarded-For if present — if server is exposed directly to
+// the public network you may want to remove this header from request by
+// wrapper.
 type Handler func(context.Context) (net.Conn, error)
 
 func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -47,14 +52,24 @@ func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		{"REQUEST_URI", r.RequestURI},
 		{"PATH_INFO", r.URL.Path},
 		{"SERVER_PROTOCOL", r.Proto},
-		{"REQUEST_SCHEME", r.URL.Scheme},
 		{"SERVER_NAME", r.Host},
 	}
-	if r.URL.Scheme == "https" {
+	if r.URL.Scheme == "https" || r.Header.Get("X-Forwarded-Proto") == "https" {
 		headers = append(headers, hdr{"HTTPS", "on"})
 	}
+	var hasRemoteAddr bool
+	if s := r.Header.Get("X-Forwarded-For"); s != "" {
+		if i := strings.IndexByte(s, ','); i > 0 {
+			s = s[:i]
+		}
+		headers = append(headers, hdr{"REMOTE_ADDR", s})
+		hasRemoteAddr = true
+	}
 	if host, port, err := net.SplitHostPort(r.RemoteAddr); err == nil {
-		headers = append(headers, hdr{"REMOTE_ADDR", host}, hdr{"REMOTE_PORT", port})
+		if !hasRemoteAddr {
+			headers = append(headers, hdr{"REMOTE_ADDR", host})
+		}
+		headers = append(headers, hdr{"REMOTE_PORT", port})
 	}
 	if addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
 		if _, port, err := net.SplitHostPort(addr.String()); err == nil {
