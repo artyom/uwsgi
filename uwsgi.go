@@ -17,7 +17,7 @@ import (
 	"unicode"
 )
 
-// Handler returns http.Handler that proxies requests to uWSGI backend that can
+// Handler is a http.Handler that proxies requests to uWSGI backend that can
 // be connected to using dialFunc.
 //
 // Usage example:
@@ -28,13 +28,9 @@ import (
 //		return d.DialContext(ctx, network, addr)
 //	}
 //	log.Fatal(http.ListenAndServe("localhost:8080", uwsgi.Handler(fn)))
-func Handler(dialFunc func(context.Context) (net.Conn, error)) http.Handler {
-	return dialer(dialFunc)
-}
+type Handler func(context.Context) (net.Conn, error)
 
-type dialer func(context.Context) (net.Conn, error)
-
-func (dial dialer) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	logf := logFunc(r)
 	if r.Header.Get("Trailer") != "" {
 		http.Error(w, "Request trailers are not supported", http.StatusBadRequest)
