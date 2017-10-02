@@ -1,4 +1,4 @@
-// Package uwsgi provides http.Handler proxying requests to uWSGI listener.
+// Package uwsgi provides http.Handler proxying requests to an uWSGI backend.
 package uwsgi
 
 import (
@@ -17,7 +17,7 @@ import (
 	"unicode"
 )
 
-// Handler is a http.Handler that proxies requests to uWSGI backend that can
+// Handler is a http.Handler that proxies requests to an uWSGI backend that can
 // be connected to using dialFunc.
 //
 // Usage example:
@@ -29,10 +29,27 @@ import (
 //	}
 //	log.Fatal(http.ListenAndServe("localhost:8080", uwsgi.Handler(fn)))
 //
-// Handler fills some uWSGI-specific headers for backend; REMOTE_ADDR is
-// populated from X-Forwarded-For if present — if server is exposed directly to
-// the public network you may want to remove this header from request by
-// wrapper.
+// Handler sets some uWSGI-specific variables:
+//
+//	QUERY_STRING
+//	REQUEST_METHOD
+//	CONTENT_TYPE
+//	CONTENT_LENGTH
+//	REQUEST_URI
+//	PATH_INFO
+//	SERVER_PROTOCOL
+//	SERVER_NAME — value from the "Host:" header
+//	HTTPS — only set to "on" if request has https scheme or
+//		X-Forwarded-Proto: https header
+//	SERVER_PORT — set to "443" if request has https scheme or
+//		X-Forwarded-Proto: https header
+//	REMOTE_ADDR — either address of connected peer, or leftmost value from
+//		X-Forwarded-For header if present
+//	REMOTE_PORT — port of connected peer, if can be detected
+//
+// Note the REMOTE_ADDR variable is populated from X-Forwarded-For if present
+// — if server is exposed directly to the public network you may want to ensure
+// this header is cleared before passing request to this Handler.
 type Handler func(context.Context) (net.Conn, error)
 
 func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
