@@ -55,7 +55,13 @@ func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		{"SERVER_NAME", r.Host},
 	}
 	if r.URL.Scheme == "https" || r.Header.Get("X-Forwarded-Proto") == "https" {
-		headers = append(headers, hdr{"HTTPS", "on"})
+		headers = append(headers, hdr{"HTTPS", "on"}, hdr{"SERVER_PORT", "443"})
+	} else if addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
+		if _, port, err := net.SplitHostPort(addr.String()); err == nil {
+			headers = append(headers, hdr{"SERVER_PORT", port})
+		}
+	} else {
+		headers = append(headers, hdr{"SERVER_PORT", "80"})
 	}
 	var hasRemoteAddr bool
 	if s := r.Header.Get("X-Forwarded-For"); s != "" {
@@ -70,11 +76,6 @@ func (dial Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 			headers = append(headers, hdr{"REMOTE_ADDR", host})
 		}
 		headers = append(headers, hdr{"REMOTE_PORT", port})
-	}
-	if addr, ok := r.Context().Value(http.LocalAddrContextKey).(net.Addr); ok {
-		if _, port, err := net.SplitHostPort(addr.String()); err == nil {
-			headers = append(headers, hdr{"SERVER_PORT", port})
-		}
 	}
 	for k, v := range r.Header {
 		k2 := "HTTP_" + strings.Map(func(r rune) rune {
